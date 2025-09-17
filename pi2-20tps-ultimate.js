@@ -1,5 +1,5 @@
 javascript:(function(){
-  // Pi² 20 TPS Ultimate Auto-Clicker - Full Game Flow Automation
+  // Pi² 20 TPS Ultimate Auto-Clicker - Full Game Flow Automation with Realism
   console.log('🚀 Pi² 20 TPS Ultimate Auto-Clicker Starting...');
   
   let isActive = false;
@@ -9,23 +9,45 @@ javascript:(function(){
   let sessionClicks = 0;
   let currentTPS = 0;
   let gameStarted = false;
-  let targetTPS = 20;
+  let clicksSinceIdle = 0;
+  let nextIdleThreshold = 0;
   
-  // Optimized for 20 TPS peak performance
+  // Realism & Performance Configuration
   const config = {
-    maxClicks: 220,           // Maximum clicks per session
-    peakTPS: 20,              // Target peak TPS
-    normalTPS: 18,            // Normal TPS after peak
-    peakDuration: 50,         // Clicks at peak TPS
-    minDelay: 49,             // 49ms = ~20.4 TPS (ensures 20+ TPS)
-    normalDelay: 55,          // 55ms = ~18 TPS
+    maxClicks: Math.floor(Math.random() * (250 - 210 + 1)) + 210,  // random between 210–250
+    minTPS: 10,               // Target minimum TPS (at maxClicks)
+    peakTPS: 20,              // Target peak TPS (at start)
     warningClicks: 200,       // Warning at 200 clicks
-    pauseAfterLimit: 12000,   // 12 second pause after hitting limit
+    pauseAfterLimit: (Math.floor(Math.random() * (15 - 10 + 1)) + 10) * 1000, // random 10–15 sec
     gameStartDelay: 2000,     // 2 second delay after starting game
-    restartDelay: 3000        // 3 second delay after game over
+    restartDelay: 3000,       // 3 second delay after game over
+    idleClickMin: Math.floor(Math.random() * (50 - 35 + 1)) + 35,  // random 35–50
+    idleClickMax: Math.floor(Math.random() * (70 - 55 + 1)) + 55,  // random 55–70
+    idleDelayMin: 100,        // Min duration of idle pause (ms)
+    idleDelayMax: 400         // Max duration of idle pause (ms)
   };
   
-  // Function to get target color
+  // Function to add micro-jitter (±5ms randomization)
+  function getJitter() {
+    return Math.random() * 10 - 5; // ±5ms
+  }
+
+  // Function to calculate optimal delay with dynamic TPS curve
+  function calculateDelay() {
+    const minDelay = 1000 / config.peakTPS;
+    const maxDelay = 1000 / config.minTPS;
+    
+    // Calculate the target delay using a linear decrease
+    const progress = Math.min(sessionClicks / config.maxClicks, 1);
+    let delay = minDelay + (maxDelay - minDelay) * progress;
+    
+    // Apply micro-jitter
+    delay += getJitter();
+    
+    return delay;
+  }
+  
+  // Function to get target color from the image alt text
   function getTargetColor() {
     const targetImg = document.querySelector('img[alt*="Target Color"]');
     if (targetImg) {
@@ -36,30 +58,6 @@ javascript:(function(){
       }
     }
     return null;
-  }
-  
-  // Function to calculate optimal delay for 20 TPS peak
-  function calculateDelay() {
-    const now = Date.now();
-    const timeSinceLastClick = now - lastClickTime;
-    
-    // Calculate current TPS
-    if (timeSinceLastClick > 0) {
-      currentTPS = 1000 / timeSinceLastClick;
-    }
-    
-    // Peak TPS phase (first 50 clicks)
-    if (sessionClicks < config.peakDuration) {
-      return config.minDelay; // 49ms = ~20.4 TPS (ensures 20+ TPS)
-    }
-    
-    // Normal TPS phase (clicks 51-200)
-    if (sessionClicks < config.warningClicks) {
-      return config.normalDelay; // 55ms = ~18 TPS
-    }
-    
-    // Slow down near limit (clicks 201-220)
-    return 100; // 10 TPS when near limit
   }
   
   // Function to find and click the correct orb
@@ -90,16 +88,14 @@ javascript:(function(){
       targetOrb.click();
       clickCount++;
       sessionClicks++;
+      clicksSinceIdle++;
       lastClickTime = Date.now();
       
       // Log progress with TPS info
       if (sessionClicks % 25 === 0) {
-        const phase = sessionClicks < config.peakDuration ? 'PEAK' : 
-                     sessionClicks < config.warningClicks ? 'NORMAL' : 'SLOW';
-        console.log(`📊 ${phase}: ${sessionClicks}/${config.maxClicks} clicks (${currentTPS.toFixed(1)} TPS)`);
+        console.log(`📊 ${sessionClicks}/${config.maxClicks} clicks (${currentTPS.toFixed(1)} TPS)`);
       }
       
-      console.log(`✅ Click ${sessionClicks} (${targetColor}) - TPS: ${currentTPS.toFixed(1)}`);
       return true;
     } else {
       console.log(`❌ ${targetColor} orb not found or disabled`);
@@ -150,6 +146,8 @@ javascript:(function(){
         clickCount = 0;
         startTime = Date.now();
         sessionClicks = 0;
+        clicksSinceIdle = 0;
+        nextIdleThreshold = 0;
         gameStarted = true;
         return true;
       }
@@ -160,6 +158,12 @@ javascript:(function(){
   // Main clicking loop
   function clickLoop() {
     if (!isActive) return;
+    
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTime;
+    if (timeSinceLastClick > 0) {
+      currentTPS = 1000 / timeSinceLastClick;
+    }
     
     // Check if we've hit the click limit
     if (sessionClicks >= config.maxClicks) {
@@ -186,10 +190,28 @@ javascript:(function(){
       }
     }
     
-    // Try to click the correct orb
-    const success = clickCorrectOrb();
+    // Idle simulation: check if it's time for a random pause
+    if (nextIdleThreshold === 0) {
+      // Set the next random threshold if not already set
+      nextIdleThreshold = Math.floor(Math.random() * (config.idleClickMax - config.idleClickMin + 1)) + config.idleClickMin;
+    }
     
-    // Calculate optimal delay
+    if (clicksSinceIdle >= nextIdleThreshold) {
+      const idleDelay = Math.floor(Math.random() * (config.idleDelayMax - config.idleDelayMin + 1)) + config.idleDelayMin;
+      console.log(`⏳ Idle simulation: pausing for ${idleDelay}ms after ${clicksSinceIdle} clicks...`);
+      clicksSinceIdle = 0;
+      nextIdleThreshold = 0; // Reset for next cycle
+      setTimeout(() => {
+        clickCorrectOrb();
+        setTimeout(clickLoop, calculateDelay());
+      }, idleDelay);
+      return;
+    }
+    
+    // Try to click the correct orb
+    clickCorrectOrb();
+    
+    // Calculate optimal delay for next click
     const delay = calculateDelay();
     setTimeout(clickLoop, delay);
   }
@@ -208,12 +230,11 @@ javascript:(function(){
 • Session Clicks: ${sessionClicks}
 • Duration: ${duration.toFixed(1)} seconds
 • Average TPS: ${avgTPS.toFixed(1)}
-• Peak TPS: ${currentTPS.toFixed(1)}
 
-🎯 Strategy Used:
-• Peak Phase: 20 TPS (first ${config.peakDuration} clicks)
-• Normal Phase: 18 TPS (clicks ${config.peakDuration + 1}-${config.warningClicks})
-• Slow Phase: 10 TPS (clicks ${config.warningClicks + 1}-${config.maxClicks})
+🎯 Realism Features:
+• Dynamic TPS curve: Starts at ${config.peakTPS} TPS, gradually decreases to ${config.minTPS} TPS.
+• Micro-jitter: Delays vary by ±5ms.
+• Idle simulation: Random pauses every ${config.idleClickMin}-${config.idleClickMax} clicks.
 • Max Clicks: ${config.maxClicks} (${sessionClicks >= config.maxClicks ? 'REACHED' : 'OK'})`);
       
       console.log('⏹️ 20 TPS Ultimate auto-clicker stopped');
@@ -223,10 +244,12 @@ javascript:(function(){
       startTime = Date.now();
       lastClickTime = 0;
       sessionClicks = 0;
+      clicksSinceIdle = 0;
+      nextIdleThreshold = 0;
       gameStarted = false;
       
       console.log('▶️ 20 TPS Ultimate auto-clicker started');
-      console.log('🎯 Strategy: 20 TPS peak → 18 TPS normal → 10 TPS slow');
+      console.log('🎯 Strategy: Dynamic TPS curve (20 → 10 TPS) with realism features');
       
       // Start the game first
       if (startGame()) {
@@ -245,7 +268,7 @@ javascript:(function(){
   
   if (hasGameElements) {
     console.log('✅ Pi² game detected, starting 20 TPS Ultimate auto-clicker...');
-    console.log('🚀 Target: 20 TPS peak performance');
+    console.log('🚀 Target: Realistic human-like performance');
     console.log('🎮 Auto-starting game and handling full flow');
     toggle(); // Auto-start
   } else {
