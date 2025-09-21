@@ -14,7 +14,7 @@ javascript:(function(){
   
   // Realism & Performance Configuration
   const config = {
-    maxClicks: Math.floor(Math.random() * (250 - 210 + 1)) + 210,  // random between 210–250
+    maxClicks: Math.floor(Math.random() * (220 - 200 + 1)) + 200,  // random between 200–220
     minTPS: 10,               // Target minimum TPS (at maxClicks)
     peakTPS: 20,              // Target peak TPS (at start)
     warningClicks: 200,       // Warning at 200 clicks
